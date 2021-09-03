@@ -1,14 +1,14 @@
 [
 {
-  "modid": "examplemod",
-  "name": "Example Mod",
-  "description": "Example placeholder mod.",
+  "modid": "levelbigger",
+  "name": "Bigger With Level",
+  "description": "With player level increasing, the player's size and other ability will increase.",
   "version": "${version}",
   "mcversion": "${mcversion}",
   "url": "",
   "updateUrl": "",
-  "authorList": ["ExampleDude"],
-  "credits": "The Forge and FML guys, for making this example",
+  "authorList": ["xwm"],
+  "credits": "Creeper Studio make this mod",
   "logoFile": "",
   "screenshots": [],
   "dependencies": []
