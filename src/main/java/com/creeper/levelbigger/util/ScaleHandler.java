@@ -4,6 +4,7 @@ public class ScaleHandler
 {
     public static float getScaleFromLevel(int level)
     {
+        level = level / 2; // linear scaled
         float factor = 1;
         if (level < 0)
             factor = (-1f / level);
@@ -14,7 +15,8 @@ public class ScaleHandler
 
     public static float getReachDistanceFromLevel(int level)
     {
-        return getScaleFromLevel(level);
+        // apply attribute
+        return getScaleFromLevel(level) - 1;
     }
 
     public static float getEyeHeightFromLevel(int level)
@@ -24,26 +26,29 @@ public class ScaleHandler
 
     public static float getMovementSpeedFromLevel(int level)
     {
-        return getScaleFromLevel(level) / 2;
+        // apply attribute
+        return (getScaleFromLevel(level) - 1) / 2;
     }
 
     public static float getJumpDistanceFromLevel(int level)
     {
-        return getScaleFromLevel(level);
+        return getScaleFromLevel(level) - 1;
     }
 
     public static float getJumpMovementFromLevel(int level)
     {
-        return getScaleFromLevel(level) / 30.0f;
+        return Math.max(1, getScaleFromLevel(level) / 10);
     }
 
     public static float getAttackDamageFromLevel(int level)
     {
-        return getScaleFromLevel(level);
+        // apply attribute
+        return getScaleFromLevel(level) - 1;
     }
 
     public static float getMaxHealthFromLevel(int level)
     {
+        // apply attribute
         return Math.min(50.0f, getScaleFromLevel(level)) - 1;
     }
 }

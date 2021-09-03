@@ -1,13 +1,15 @@
 package com.creeper.levelbigger.event;
 
+import com.creeper.levelbigger.network.NetworkLoader;
+import com.creeper.levelbigger.network.SPacketScale;
 import com.creeper.levelbigger.util.Reference;
 import com.creeper.levelbigger.util.ScaleHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
-import net.minecraft.entity.passive.EntityAnimal;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.server.management.PlayerList;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EntityDamageSource;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -18,6 +20,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
@@ -26,7 +29,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 @Mod.EventBusSubscriber
 public class CommonEventLoader
@@ -40,11 +42,36 @@ public class CommonEventLoader
     private static final Map<UUID, Integer> PLAYER_LEVEL_MAP = new HashMap<>();
     private static final Map<UUID, Integer> CLIENT_PLAYER_LEVEL_MAP = new HashMap<>();
 
+    private int tick = 0;
+
+
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event)
     {
-        event.player.sendMessage(new TextComponentString(TextFormatting.YELLOW + "【苦力怕】成长体型  " + TextFormatting.GREEN+"已加载!"));
+        event.player.sendMessage(new TextComponentString(TextFormatting.YELLOW + "[虎牙HSC竞赛]生存进化  " + TextFormatting.GREEN+"已加载!"));
     }
+
+    @SubscribeEvent
+    public void onWorldTick(TickEvent.WorldTickEvent event)
+    {
+        World world = event.world;
+        if (!world.isRemote && event.phase == TickEvent.Phase.END)
+        {
+            tick++;
+            if (tick == 20)
+            {
+                PlayerList playerList = FMLCommonHandler.instance().getMinecraftServerInstance().getPlayerList();
+                for (EntityPlayer player : playerList.getPlayers())
+                {
+                    SPacketScale packet = new SPacketScale(player.experienceLevel, player.getUniqueID());
+                    NetworkLoader.instance.sendToAll(packet);
+                }
+
+                tick = 0;
+            }
+        }
+    }
+
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event)
@@ -68,6 +95,9 @@ public class CommonEventLoader
         {
             height *= 0.91666666666f;
             eyeHeight *= 0.9382716f;
+
+            if (ScaleHandler.getScaleFromLevel(level) > 2)
+                eyeHeight *= 1 / (ScaleHandler.getScaleFromLevel(level) - 1);
         }
         if (player.isElytraFlying())
         {
@@ -87,8 +117,9 @@ public class CommonEventLoader
 
         player.width = width;
         player.height = height;
-//        player.eyeHeight = eyeHeight;
         player.eyeHeight = eyeHeight * ScaleHandler.getEyeHeightFromLevel(level);
+        player.jumpMovementFactor *= ScaleHandler.getJumpMovementFromLevel(level);
+
         double d0 = width / 2.0D;
         AxisAlignedBB aabb = player.getEntityBoundingBox();
         player.setEntityBoundingBox(new AxisAlignedBB(player.posX - d0, aabb.minY, player.posZ - d0,
@@ -116,13 +147,13 @@ public class CommonEventLoader
         {
             EntityPlayer player = (EntityPlayer) event.getEntityLiving();
             float jumpHeight = ScaleHandler.getJumpDistanceFromLevel(player.experienceLevel);
-            jumpHeight = MathHelper.clamp(jumpHeight, 0.65F, jumpHeight);
+            jumpHeight = MathHelper.clamp(jumpHeight, 0.65f, jumpHeight);
             if (jumpHeight > 1)
                 player.motionY *= jumpHeight;
 
             if(player.isSneaking() || player.isSprinting())
             {
-                if(player.height < 1.8F) player.motionY = 0.42F;
+                if(player.height < 1.8f) player.motionY = 0.45f;
             }
         }
     }
@@ -133,9 +164,8 @@ public class CommonEventLoader
         if (event.getEntityLiving() instanceof EntityPlayer)
         {
             EntityPlayer player = (EntityPlayer) event.getEntityLiving();
-            float scale = ScaleHandler.getScaleFromLevel(player.experienceLevel);
-            if (scale > 1)
-                event.setDistance(event.getDistance() / (scale * 2));
+            event.setDistance(event.getDistance() / (player.height * 0.6f));
+            if(player.height < 0.5f) event.setDistance(0); // maybe some mod make the level < 0, then, player would be very small...
         }
     }
 
@@ -160,9 +190,12 @@ public class CommonEventLoader
     {
         if (event instanceof PlayerInteractEvent.EntityInteract) {
             EntityPlayer player = event.getEntityPlayer();
-            Entity entity = event.getEntity();
-            float playerSize = player.width * player.height;
-            float entitySize = entity.width * entity.height;
+            Entity entity = ((PlayerInteractEvent.EntityInteract) event).getTarget();
+//            float playerSize = player.width * player.height; size cause ridiculous problem, just use height
+//            float entitySize = entity.width * entity.height;
+
+            float playerSize = player.height;
+            float entitySize = entity.height;
 
             if (player.getHeldItemMainhand().isEmpty() && entity instanceof EntityLivingBase)
             {
@@ -176,9 +209,19 @@ public class CommonEventLoader
             }
         }
         else if (event instanceof PlayerInteractEvent.RightClickBlock)
-        {                               df yuz//////////
+        {
             EntityPlayer player = event.getEntityPlayer();
-            player.dismountRidingEntity();
+            if (player.getHeldItemMainhand().isEmpty() && player.isBeingRidden() && player.isSneaking())
+            {
+                for(Entity entities : player.getPassengers())
+                {
+                    if(entities instanceof EntityLivingBase)
+                    {
+                        entities.dismountRidingEntity();
+                    }
+                }
+            }
+
         }
     }
 
@@ -226,8 +269,6 @@ public class CommonEventLoader
         player.getEntityAttribute(EntityPlayer.SWIM_SPEED).
                 applyModifier(new AttributeModifier(SWIM_SPEED_MODIFIER_NAME, Reference.MODID, ScaleHandler.getMovementSpeedFromLevel(level), 2).setSaved(true));
 
-
-        player.jumpMovementFactor = ScaleHandler.getJumpMovementFromLevel(level);
     }
 
     private DamageSource causeCrushingDamage(EntityLivingBase entity)

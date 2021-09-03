@@ -3,8 +3,13 @@ package com.creeper.levelbigger.event;
 import com.creeper.levelbigger.util.ScaleHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.MobEffects;
+import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
+import net.minecraftforge.client.event.FOVUpdateEvent;
+import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -16,21 +21,26 @@ public class ClientEventLoader
 {
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
-    public void onPlayerRenderPre(RenderPlayerEvent.Pre event)
+    public void onPlayerRenderPre(RenderLivingEvent.Pre event)
     {
-        EntityPlayer player = event.getEntityPlayer();
-        int level = player.experienceLevel;
-        float scale = ScaleHandler.getScaleFromLevel(level);
-        GlStateManager.pushMatrix();
-        GlStateManager.scale(scale, scale, scale);
-        GlStateManager.translate(event.getX() / scale - event.getX(), event.getY() / scale - event.getX(), event.getZ() / scale - event.getZ());
+        if (event.getEntity() instanceof EntityPlayer)
+        {
+            EntityPlayer player = (EntityPlayer) event.getEntity();
+            int level = player.experienceLevel;
+            float scale = ScaleHandler.getScaleFromLevel(level);
+            GlStateManager.pushMatrix();
+            GlStateManager.scale(scale, scale, scale);
+            GlStateManager.translate(event.getX() / scale - event.getX(), event.getY() / scale - event.getY(), event.getZ() / scale - event.getZ());
+        }
     }
 
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
-    public void onPlayerRenderPost(RenderPlayerEvent.Post event)
+    public void onPlayerRenderPost(RenderLivingEvent.Post event)
     {
-        GlStateManager.popMatrix();
+        if (event.getEntity() instanceof EntityPlayer) {
+            GlStateManager.popMatrix();
+        }
     }
 
     @SubscribeEvent
@@ -48,6 +58,22 @@ public class ClientEventLoader
         if(Minecraft.getMinecraft().gameSettings.thirdPersonView == 2)
         {
             if(player.height > 1.8F) GlStateManager.translate(0, 0, scale * 2);
+        }
+    }
+
+    @SubscribeEvent
+    @SideOnly(Side.CLIENT)
+    public void onFOVChange(FOVUpdateEvent event) {
+        if (event.getEntity() != null) {
+            EntityPlayer player = event.getEntity();
+            PotionEffect speed = player.getActivePotionEffect(MobEffects.SPEED);
+            float fov = 1.0f;
+
+            if (player.isSprinting()) {
+                event.setNewfov(speed != null ? fov + ((0.1F * (speed.getAmplifier() + 1)) + 0.15F) : fov + 0.1F);
+            } else {
+                event.setNewfov(speed != null ? fov + (0.1F * (speed.getAmplifier() + 1)) : fov);
+            }
         }
     }
 }
